@@ -14,25 +14,36 @@ BoundedBuffer::BoundedBuffer(int N){
 
 void BoundedBuffer::append(int data){
 	//TODO: append a data item to the circular buffer
+	cout << "appending\n";
 	pthread_mutex_lock(&buffer_lock);
-	if(buffer_cnt == buffer_size) pthread_cond_wait(&buffer_full, &buffer_lock);
-	buffer[buffer_size - 1 - buffer_cnt++] = buffer_last = data;
+	cout << "append lock\n";
+	while(buffer_cnt == buffer_size) {
+		cout << "calling wait on full\n";
+		pthread_cond_wait(&buffer_full, &buffer_lock);
+	}
+	buffer[buffer_last] = data;
+	buffer_last = (buffer_last + 1) % buffer_size;
+	buffer_cnt++;
 	pthread_cond_broadcast(&buffer_empty);
+	cout << "append unlock\n";
 	pthread_mutex_unlock(&buffer_lock);
 }
 
 int BoundedBuffer::remove(){
 	//TODO: remove and return a data item from the circular buffer
+	cout << "removing\n";
 	pthread_mutex_lock(&buffer_lock);
-	if(isEmpty()) pthread_cond_wait(&buffer_empty, &buffer_lock);
-	if(buffer_cnt == buffer_size) {
-		buffer[0] = 0;
-		pthread_cond_broadcast(&buffer_full);
+	cout << "remove lock\n";
+	while(isEmpty()) {
+		cout << "calling wait on empty\n";
+		pthread_cond_wait(&buffer_empty, &buffer_lock);
 	}
-	else buffer[buffer_cnt - 1] = 0;
+	int i = (buffer_last - buffer_cnt-- + buffer_size) % buffer_size;
+	int data = buffer[i];
+	pthread_cond_broadcast(&buffer_full);
+	cout << "remove lock\n";
 	pthread_mutex_unlock(&buffer_lock);
-	buffer_cnt--;
-	return buffer_last;
+	return data;
 }
 
 bool BoundedBuffer::isEmpty(){
